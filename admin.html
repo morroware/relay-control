@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Settings</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background-color: #1e1e1e;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            max-width: 800px;
+            width: 100%;
+            border: 1px solid #333;
+        }
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 20px;
+        }
+        .form-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .form-section {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        h2 {
+            color: #FFAB00;
+            margin-top: 0;
+            border-bottom: 1px solid #444;
+            padding-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ccc;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 15px;
+            border-radius: 4px;
+            border: 1px solid #555;
+            background-color: #333;
+            color: #eee;
+            box-sizing: border-box;
+        }
+        .relay-pins-grid {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 10px;
+            align-items: center;
+        }
+        .submit-button {
+            grid-column: 1 / -1;
+            background-color: #C62828;
+            color: white;
+            border: none;
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+            margin-top: 20px;
+        }
+        .submit-button:hover {
+            background-color: #D32F2F;
+        }
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin-top: 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            display: none;
+        }
+        .status.success {
+            background-color: #1B5E20;
+            color: #A5D8A6;
+            display: block;
+        }
+        .status.error {
+            background-color: #B71C1C;
+            color: #FFCDD2;
+            display: block;
+        }
+        a {
+            color: #66BB6A;
+            text-decoration: none;
+            display: block;
+            text-align: center;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Admin Configuration</h1>
+        <form id="configForm">
+            <div class="form-grid">
+                <div class="form-section">
+                    <h2>Relay Settings</h2>
+                    <label for="trigger_duration">Trigger Duration (seconds)</label>
+                    <input type="number" id="trigger_duration" name="trigger_duration" step="0.1">
+
+                    <label for="max_concurrent_triggers">Max Concurrent Triggers</label>
+                    <input type="number" id="max_concurrent_triggers" name="max_concurrent_triggers">
+
+                    <label for="active_low">Relay Type (Active Low)</label>
+                    <select id="active_low" name="active_low">
+                        <option value="true">True</option>
+                        <option value="false">False</option>
+                    </select>
+                </div>
+
+                <div class="form-section">
+                    <h2>Relay Pins (GPIO)</h2>
+                    <div class="relay-pins-grid">
+                        <label for="pin1">Relay 1:</label> <input type="number" id="pin1" name="pin1">
+                        <label for="pin2">Relay 2:</label> <input type="number" id="pin2" name="pin2">
+                        <label for="pin3">Relay 3:</label> <input type="number" id="pin3" name="pin3">
+                        <label for="pin4">Relay 4:</label> <input type="number" id="pin4" name="pin4">
+                        <label for="pin5">Relay 5:</label> <input type="number" id="pin5" name="pin5">
+                        <label for="pin6">Relay 6:</label> <input type="number" id="pin6" name="pin6">
+                        <label for="pin7">Relay 7:</label> <input type="number" id="pin7" name="pin7">
+                        <label for="pin8">Relay 8:</label> <input type="number" id="pin8" name="pin8">
+                    </div>
+                </div>
+            </div>
+            <button type="submit" class="submit-button">Save and Restart Service</button>
+        </form>
+        <div id="status" class="status"></div>
+        <a href="/">Back to Control Panel</a>
+    </div>
+
+    <script>
+        // Fetch current config and populate the form
+        fetch('/admin/config')
+            .then(response => response.json())
+            .then(config => {
+                document.getElementById('trigger_duration').value = config.relay_settings.trigger_duration;
+                document.getElementById('max_concurrent_triggers').value = config.relay_settings.max_concurrent_triggers;
+                document.getElementById('active_low').value = config.relay_settings.active_low.toString();
+                for (let i = 1; i <= 8; i++) {
+                    document.getElementById(`pin${i}`).value = config.relay_pins[i.toString()];
+                }
+            });
+
+        // Handle form submission
+        document.getElementById('configForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const statusDiv = document.getElementById('status');
+            statusDiv.style.display = 'none';
+
+            const formData = new FormData(event.target);
+            const data = {
+                relay_settings: {
+                    trigger_duration: parseFloat(formData.get('trigger_duration')),
+                    max_concurrent_triggers: parseInt(formData.get('max_concurrent_triggers')),
+                    active_low: formData.get('active_low') === 'true'
+                },
+                relay_pins: {
+                    "1": parseInt(formData.get('pin1')),
+                    "2": parseInt(formData.get('pin2')),
+                    "3": parseInt(formData.get('pin3')),
+                    "4": parseInt(formData.get('pin4')),
+                    "5": parseInt(formData.get('pin5')),
+                    "6": parseInt(formData.get('pin6')),
+                    "7": parseInt(formData.get('pin7')),
+                    "8": parseInt(formData.get('pin8'))
+                }
+            };
+
+            fetch('/admin/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.status === 'success') {
+                    statusDiv.className = 'status success';
+                    statusDiv.textContent = 'Configuration saved! Service is restarting...';
+                } else {
+                    statusDiv.className = 'status error';
+                    statusDiv.textContent = `Error: ${result.message}`;
+                }
+                statusDiv.style.display = 'block';
+            })
+            .catch(error => {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = `An unexpected error occurred: ${error}`;
+                statusDiv.style.display = 'block';
+            });
+        });
+    </script>
+</body>
+</html>
