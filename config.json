@@ -11,8 +11,24 @@
     },
     "relay_settings": {
         "active_low": true,
-        "trigger_duration": 2,
         "max_concurrent_triggers": 3
+    },
+    "relay_timers": {
+        "1": 2.0,
+        "2": 3.0,
+        "3": 1.5,
+        "4": 5.0,
+        "5": 2.5,
+        "6": 4.0,
+        "7": 1.0,
+        "8": 10.0
+    },
+    "physical_button": {
+        "enabled": true,
+        "pin": 2,
+        "pull_up": true,
+        "debounce_time": 0.3,
+        "target_relay": 1
     },
     "server": {
         "host": "0.0.0.0",
