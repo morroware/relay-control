@@ -88,7 +88,6 @@ class Config:
                 base[key] = value
 
     @property
-    @property
     def RELAY_PINS(self):
         return {int(k): v for k, v in self.config["relay_pins"].items()}
 
