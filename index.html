@@ -24,6 +24,7 @@
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             max-width: 600px;
             width: 100%;
+            position: relative;
         }
 
         h1 {
@@ -127,11 +128,19 @@
         .connection-status.disconnected {
             color: #f44336;
         }
+        
+        @media (max-width: 480px) {
+            .relay-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="status-indicator" id="systemStatus"></div>
         <h1>8-Relay Control Panel</h1>
+        <div class="connection-status" id="connectionStatus">Checking connection...</div>
         <div class="relay-grid">
             <button class="relay-button" onclick="triggerRelay(1)">Relay 1</button>
             <button class="relay-button" onclick="triggerRelay(2)">Relay 2</button>
