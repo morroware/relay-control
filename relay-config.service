@@ -5,11 +5,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
+User=tech
 Group=gpio
-WorkingDirectory=/home/pi/relay_control
-Environment="PATH=/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/usr/bin/python3 /home/pi/relay_control/app.py
+WorkingDirectory=/home/tech/relay_control
+Environment="PATH=/home/tech/relay_control/venv/bin"
+ExecStart=/home/tech/relay_control/venv/bin/python3 /home/tech/relay_control/app.py
 Restart=always
 RestartSec=10
 
@@ -18,7 +18,8 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/var/log/relay_control
+# FIX: Add the line below to allow writing to the app's directory
+ReadWritePaths=/home/tech/relay_control/
 
 # Resource limits
 CPUQuota=50%
