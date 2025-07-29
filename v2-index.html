@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8-Relay Control Panel</title>
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2366BB6A'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z'/></svg>">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        .container {
+            background-color: #1e1e1e;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            max-width: 600px;
+            width: 100%;
+            position: relative;
+            border: 1px solid #333;
+        }
+
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 30px;
+        }
+
+        .relay-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .relay-button {
+            background-color: #004D40; /* Dark Teal */
+            color: white;
+            border: 1px solid #00796B;
+            padding: 20px;
+            font-size: 18px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .relay-button:hover {
+            background-color: #00796B;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+        }
+
+        .relay-button:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+        }
+
+        .relay-button.active {
+            background-color: #FF6F00; /* Amber */
+            border-color: #FF8F00;
+            animation: pulse 0.5s infinite alternate;
+        }
+
+        @keyframes pulse {
+            from { opacity: 1; }
+            to { opacity: 0.8; }
+        }
+
+        .status {
+            text-align: center;
+            padding: 10px;
+            margin-top: 20px;
+            border-radius: 5px;
+            font-weight: bold;
+            display: none;
+        }
+
+        .status.success {
+            background-color: #1B5E20;
+            color: #A5D8A6;
+            border: 1px solid #2E7D32;
+            display: block;
+        }
+
+        .status.error {
+            background-color: #B71C1C;
+            color: #FFCDD2;
+            border: 1px solid #C62828;
+            display: block;
+        }
+
+        .status-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: #66BB6A; /* Green */
+            box-shadow: 0 0 10px rgba(102, 187, 106, 0.7);
+        }
+
+        .status-indicator.error {
+            background-color: #EF5350; /* Red */
+            box-shadow: 0 0 10px rgba(239, 83, 80, 0.7);
+        }
+
+        .connection-status {
+            text-align: center;
+            font-size: 14px;
+            color: #757575;
+            margin-bottom: 15px;
+        }
+
+        .connection-status.connected {
+            color: #66BB6A;
+        }
+
+        .connection-status.disconnected {
+            color: #EF5350;
+        }
+
+        @media (max-width: 480px) {
+            .relay-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="status-indicator" id="systemStatus"></div>
+        <h1>8-Relay Control Panel</h1>
+        <div class="connection-status" id="connectionStatus">Checking connection...</div>
+        <div class="relay-grid">
+            <button class="relay-button" onclick="triggerRelay(1)">Relay 1</button>
+            <button class="relay-button" onclick="triggerRelay(2)">Relay 2</button>
+            <button class="relay-button" onclick="triggerRelay(3)">Relay 3</button>
+            <button class="relay-button" onclick="triggerRelay(4)">Relay 4</button>
+            <button class="relay-button" onclick="triggerRelay(5)">Relay 5</button>
+            <button class="relay-button" onclick="triggerRelay(6)">Relay 6</button>
+            <button class="relay-button" onclick="triggerRelay(7)">Relay 7</button>
+            <button class="relay-button" onclick="triggerRelay(8)">Relay 8</button>
+        </div>
+        <div id="status" class="status"></div>
+    </div>
+
+    <script>
+        let isConnected = true;
+        let activeRelays = new Set();
+
+        // Check system status
+        function checkStatus() {
+            fetch('/status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('connectionStatus').textContent = 'Connected';
+                    document.getElementById('connectionStatus').className = 'connection-status connected';
+                    document.getElementById('systemStatus').className = 'status-indicator';
+                    isConnected = true;
+                })
+                .catch(error => {
+                    document.getElementById('connectionStatus').textContent = 'Disconnected';
+                    document.getElementById('connectionStatus').className = 'connection-status disconnected';
+                    document.getElementById('systemStatus').className = 'status-indicator error';
+                    isConnected = false;
+                });
+        }
+
+        // Check status every 5 seconds
+        setInterval(checkStatus, 5000);
+        checkStatus();
+
+        function triggerRelay(relayNum) {
+            if (!isConnected) {
+                showStatus('Connection lost. Please check the system.', 'error');
+                return;
+            }
+
+            if (activeRelays.has(relayNum)) {
+                showStatus(`Relay ${relayNum} is already active`, 'error');
+                return;
+            }
+
+            const button = event.target;
+            const statusDiv = document.getElementById('status');
+
+            // Add to active relays
+            activeRelays.add(relayNum);
+
+            // Disable button and add active class
+            button.disabled = true;
+            button.classList.add('active');
+            button.textContent = `Relay ${relayNum} ON`;
+
+            // Send request to Flask backend
+            fetch(`/relay/${relayNum}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(err => Promise.reject(err));
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    showStatus(`Relay ${relayNum} triggered for ${data.duration} seconds`, 'success');
+
+                    // Reset button after duration
+                    setTimeout(() => {
+                        button.disabled = false;
+                        button.classList.remove('active');
+                        button.textContent = `Relay ${relayNum}`;
+                        activeRelays.delete(relayNum);
+                    }, data.duration * 1000);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showStatus(error.message || `Failed to trigger relay ${relayNum}`, 'error');
+                button.disabled = false;
+                button.classList.remove('active');
+                button.textContent = `Relay ${relayNum}`;
+                activeRelays.delete(relayNum);
+            });
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+
+            // Auto-hide after 3 seconds
+            setTimeout(() => {
+                statusDiv.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
