@@ -1,0 +1,34 @@
+{
+    "relay_pins": {
+        "1": 17,
+        "2": 18,
+        "3": 27,
+        "4": 22,
+        "5": 23,
+        "6": 24,
+        "7": 25,
+        "8": 4
+    },
+    "relay_settings": {
+        "active_low": true,
+        "trigger_duration": 2,
+        "max_concurrent_triggers": 3
+    },
+    "server": {
+        "host": "0.0.0.0",
+        "port": 5000,
+        "debug": false
+    },
+    "logging": {
+        "log_dir": "/var/log/relay_control",
+        "log_file": "relay_control.log",
+        "max_size_mb": 10,
+        "backup_count": 5,
+        "log_level": "INFO"
+    },
+    "security": {
+        "enable_auth": false,
+        "api_key": "",
+        "allowed_ips": []
+    }
+}
