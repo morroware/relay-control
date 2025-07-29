@@ -21,7 +21,7 @@
             padding: 30px;
             border-radius: 10px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-            max-width: 800px;
+            max-width: 1200px;
             width: 100%;
             border: 1px solid #333;
         }
@@ -34,6 +34,10 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
+            margin-bottom: 20px;
+        }
+        .full-width {
+            grid-column: 1 / -1;
         }
         .form-section {
             background-color: #2a2a2a;
@@ -61,11 +65,21 @@
             color: #eee;
             box-sizing: border-box;
         }
-        .relay-pins-grid {
+        .relay-pins-grid, .relay-timers-grid {
             display: grid;
-            grid-template-columns: auto 1fr;
+            grid-template-columns: auto 1fr auto;
             gap: 10px;
             align-items: center;
+        }
+        .checkbox-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .checkbox-container input[type="checkbox"] {
+            width: auto;
+            margin-right: 10px;
+            margin-bottom: 0;
         }
         .submit-button {
             grid-column: 1 / -1;
@@ -108,6 +122,53 @@
             text-align: center;
             margin-top: 20px;
         }
+        .info-text {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+            margin-bottom: 10px;
+        }
+        .timer-unit {
+            font-size: 12px;
+            color: #ccc;
+            padding: 8px;
+            background-color: #333;
+            border: 1px solid #555;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .preset-buttons {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+        }
+        .preset-btn {
+            background-color: #444;
+            color: #ccc;
+            border: 1px solid #666;
+            padding: 5px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.3s ease;
+        }
+        .preset-btn:hover {
+            background-color: #555;
+        }
+        @media (max-width: 768px) {
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+            .relay-pins-grid, .relay-timers-grid {
+                grid-template-columns: auto 1fr;
+            }
+            .timer-unit {
+                display: none;
+            }
+        }
     </style>
 </head>
 <body>
@@ -116,12 +177,9 @@
         <form id="configForm">
             <div class="form-grid">
                 <div class="form-section">
-                    <h2>Relay Settings</h2>
-                    <label for="trigger_duration">Trigger Duration (seconds)</label>
-                    <input type="number" id="trigger_duration" name="trigger_duration" step="0.1">
-
+                    <h2>General Settings</h2>
                     <label for="max_concurrent_triggers">Max Concurrent Triggers</label>
-                    <input type="number" id="max_concurrent_triggers" name="max_concurrent_triggers">
+                    <input type="number" id="max_concurrent_triggers" name="max_concurrent_triggers" min="1" max="8">
 
                     <label for="active_low">Relay Type (Active Low)</label>
                     <select id="active_low" name="active_low">
@@ -131,19 +189,67 @@
                 </div>
 
                 <div class="form-section">
-                    <h2>Relay Pins (GPIO)</h2>
+                    <h2>Physical Button</h2>
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="button_enabled" name="button_enabled">
+                        <label for="button_enabled">Enable Physical Button</label>
+                    </div>
+
+                    <label for="button_pin">Button GPIO Pin</label>
+                    <input type="number" id="button_pin" name="button_pin">
+
+                    <label for="button_target_relay">Target Relay (1-8)</label>
+                    <input type="number" id="button_target_relay" name="button_target_relay" min="1" max="8">
+
+                    <div class="checkbox-container">
+                        <input type="checkbox" id="button_pull_up" name="button_pull_up">
+                        <label for="button_pull_up">Use Internal Pull-up</label>
+                    </div>
+
+                    <label for="button_debounce_time">Debounce Time (seconds)</label>
+                    <input type="number" id="button_debounce_time" name="button_debounce_time" step="0.1" min="0.1" max="2">
+                </div>
+            </div>
+
+            <div class="form-grid">
+                <div class="form-section">
+                    <h2>Relay GPIO Pins</h2>
                     <div class="relay-pins-grid">
-                        <label for="pin1">Relay 1:</label> <input type="number" id="pin1" name="pin1">
-                        <label for="pin2">Relay 2:</label> <input type="number" id="pin2" name="pin2">
-                        <label for="pin3">Relay 3:</label> <input type="number" id="pin3" name="pin3">
-                        <label for="pin4">Relay 4:</label> <input type="number" id="pin4" name="pin4">
-                        <label for="pin5">Relay 5:</label> <input type="number" id="pin5" name="pin5">
-                        <label for="pin6">Relay 6:</label> <input type="number" id="pin6" name="pin6">
-                        <label for="pin7">Relay 7:</label> <input type="number" id="pin7" name="pin7">
-                        <label for="pin8">Relay 8:</label> <input type="number" id="pin8" name="pin8">
+                        <label for="pin1">Relay 1:</label> <input type="number" id="pin1" name="pin1"> <span></span>
+                        <label for="pin2">Relay 2:</label> <input type="number" id="pin2" name="pin2"> <span></span>
+                        <label for="pin3">Relay 3:</label> <input type="number" id="pin3" name="pin3"> <span></span>
+                        <label for="pin4">Relay 4:</label> <input type="number" id="pin4" name="pin4"> <span></span>
+                        <label for="pin5">Relay 5:</label> <input type="number" id="pin5" name="pin5"> <span></span>
+                        <label for="pin6">Relay 6:</label> <input type="number" id="pin6" name="pin6"> <span></span>
+                        <label for="pin7">Relay 7:</label> <input type="number" id="pin7" name="pin7"> <span></span>
+                        <label for="pin8">Relay 8:</label> <input type="number" id="pin8" name="pin8"> <span></span>
+                    </div>
+                </div>
+
+                <div class="form-section">
+                    <h2>Individual Relay Timers</h2>
+                    <div class="info-text">Set different trigger durations for each relay (0.1 - 300 seconds)</div>
+                    
+                    <div class="preset-buttons">
+                        <button type="button" class="preset-btn" onclick="setAllTimers(1)">1s All</button>
+                        <button type="button" class="preset-btn" onclick="setAllTimers(2)">2s All</button>
+                        <button type="button" class="preset-btn" onclick="setAllTimers(5)">5s All</button>
+                        <button type="button" class="preset-btn" onclick="setAllTimers(10)">10s All</button>
+                    </div>
+
+                    <div class="relay-timers-grid">
+                        <label for="timer1">Relay 1:</label> <input type="number" id="timer1" name="timer1" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
+                        <label for="timer2">Relay 2:</label> <input type="number" id="timer2" name="timer2" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
+                        <label for="timer3">Relay 3:</label> <input type="number" id="timer3" name="timer3" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
+                        <label for="timer4">Relay 4:</label> <input type="number" id="timer4" name="timer4" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
+                        <label for="timer5">Relay 5:</label> <input type="number" id="timer5" name="timer5" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
+                        <label for="timer6">Relay 6:</label> <input type="number" id="timer6" name="timer6" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
+                        <label for="timer7">Relay 7:</label> <input type="number" id="timer7" name="timer7" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
+                        <label for="timer8">Relay 8:</label> <input type="number" id="timer8" name="timer8" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
                     </div>
                 </div>
             </div>
+
             <button type="submit" class="submit-button">Save and Restart Service</button>
         </form>
         <div id="status" class="status"></div>
@@ -151,16 +257,43 @@
     </div>
 
     <script>
+        // Helper function to set all timers to the same value
+        function setAllTimers(seconds) {
+            for (let i = 1; i <= 8; i++) {
+                document.getElementById(`timer${i}`).value = seconds;
+            }
+        }
+
         // Fetch current config and populate the form
         fetch('/admin/config')
             .then(response => response.json())
             .then(config => {
-                document.getElementById('trigger_duration').value = config.relay_settings.trigger_duration;
+                // General settings
                 document.getElementById('max_concurrent_triggers').value = config.relay_settings.max_concurrent_triggers;
                 document.getElementById('active_low').value = config.relay_settings.active_low.toString();
+                
+                // Relay pins
                 for (let i = 1; i <= 8; i++) {
                     document.getElementById(`pin${i}`).value = config.relay_pins[i.toString()];
                 }
+                
+                // Relay timers
+                for (let i = 1; i <= 8; i++) {
+                    document.getElementById(`timer${i}`).value = config.relay_timers[i.toString()];
+                }
+                
+                // Physical button settings
+                document.getElementById('button_enabled').checked = config.physical_button.enabled;
+                document.getElementById('button_pin').value = config.physical_button.pin;
+                document.getElementById('button_target_relay').value = config.physical_button.target_relay;
+                document.getElementById('button_pull_up').checked = config.physical_button.pull_up;
+                document.getElementById('button_debounce_time').value = config.physical_button.debounce_time;
+            })
+            .catch(error => {
+                console.error('Error loading configuration:', error);
+                document.getElementById('status').className = 'status error';
+                document.getElementById('status').textContent = 'Failed to load current configuration';
+                document.getElementById('status').style.display = 'block';
             });
 
         // Handle form submission
@@ -170,23 +303,51 @@
             statusDiv.style.display = 'none';
 
             const formData = new FormData(event.target);
+            
+            // Build relay_timers object
+            const relayTimers = {};
+            for (let i = 1; i <= 8; i++) {
+                relayTimers[i.toString()] = parseFloat(formData.get(`timer${i}`));
+            }
+            
+            // Build relay_pins object
+            const relayPins = {};
+            for (let i = 1; i <= 8; i++) {
+                relayPins[i.toString()] = parseInt(formData.get(`pin${i}`));
+            }
+
             const data = {
                 relay_settings: {
-                    trigger_duration: parseFloat(formData.get('trigger_duration')),
                     max_concurrent_triggers: parseInt(formData.get('max_concurrent_triggers')),
                     active_low: formData.get('active_low') === 'true'
                 },
-                relay_pins: {
-                    "1": parseInt(formData.get('pin1')),
-                    "2": parseInt(formData.get('pin2')),
-                    "3": parseInt(formData.get('pin3')),
-                    "4": parseInt(formData.get('pin4')),
-                    "5": parseInt(formData.get('pin5')),
-                    "6": parseInt(formData.get('pin6')),
-                    "7": parseInt(formData.get('pin7')),
-                    "8": parseInt(formData.get('pin8'))
+                relay_pins: relayPins,
+                relay_timers: relayTimers,
+                physical_button: {
+                    enabled: formData.get('button_enabled') === 'on',
+                    pin: parseInt(formData.get('button_pin')),
+                    target_relay: parseInt(formData.get('button_target_relay')),
+                    pull_up: formData.get('button_pull_up') === 'on',
+                    debounce_time: parseFloat(formData.get('button_debounce_time'))
                 }
             };
+
+            // Validate timer values
+            let validationError = null;
+            for (let i = 1; i <= 8; i++) {
+                const timer = relayTimers[i.toString()];
+                if (isNaN(timer) || timer < 0.1 || timer > 300) {
+                    validationError = `Relay ${i} timer must be between 0.1 and 300 seconds`;
+                    break;
+                }
+            }
+
+            if (validationError) {
+                statusDiv.className = 'status error';
+                statusDiv.textContent = validationError;
+                statusDiv.style.display = 'block';
+                return;
+            }
 
             fetch('/admin/config', {
                 method: 'POST',
