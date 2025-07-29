@@ -75,6 +75,7 @@ class Config:
                     self._deep_update(config, user_config)
                     
                     # Migration: Convert old trigger_duration to individual timers
+                    migrated = False
                     if "trigger_duration" in config.get("relay_settings", {}):
                         old_duration = config["relay_settings"]["trigger_duration"]
                         if "relay_timers" not in config:
@@ -85,6 +86,13 @@ class Config:
                         # Remove old setting
                         del config["relay_settings"]["trigger_duration"]
                         print(f"Migrated old trigger_duration ({old_duration}s) to individual relay timers")
+                        migrated = True
+                    
+                    # Save migrated config back to file
+                    if migrated:
+                        with open(self.config_file, 'w') as f:
+                            json.dump(config, f, indent=4)
+                        print(f"Saved migrated configuration to {self.config_file}")
                     
                     print(f"Configuration loaded from {self.config_file}")
                     return config
@@ -107,13 +115,36 @@ class Config:
     def save_config(self, new_config):
         """Saves the provided configuration dictionary to the file."""
         try:
+            # Validate GPIO pins before saving
+            if "relay_pins" in new_config:
+                pins = list(new_config["relay_pins"].values())
+                # Check for valid GPIO range (0-27 for most Pi models)
+                for pin in pins:
+                    if not 0 <= pin <= 27:
+                        raise ValueError(f"GPIO pin {pin} is out of valid range (0-27)")
+                # Check for duplicates
+                if len(pins) != len(set(pins)):
+                    raise ValueError("Duplicate GPIO pins detected")
+            
+            # Validate timer values
+            if "relay_timers" in new_config:
+                for relay, duration in new_config["relay_timers"].items():
+                    if not 0.1 <= duration <= 300:
+                        raise ValueError(f"Timer for relay {relay} must be between 0.1 and 300 seconds")
+            
+            # Validate debounce time
+            if "physical_button" in new_config:
+                debounce = new_config["physical_button"].get("debounce_time", 0.3)
+                if not 0.1 <= debounce <= 2.0:
+                    raise ValueError("Debounce time must be between 0.1 and 2.0 seconds")
+            
             self._deep_update(self.config, new_config)
             with open(self.config_file, 'w') as f:
                 json.dump(self.config, f, indent=4)
             return True
         except Exception as e:
             app.logger.error(f"Failed to save configuration to {self.config_file}: {e}", exc_info=True)
-            return False
+            raise e
             
     # --- Properties ---
     @property
@@ -172,18 +203,25 @@ app = Flask(__name__)
 config_path = Path(__file__).parent / "config.json"
 config = Config(config_path)
 relay_locks = {}
+relay_states = {}  # Track relay states
 active_triggers = 0
 active_triggers_lock = threading.Lock()
 cleanup_done = False
+cleanup_lock = threading.Lock()  # Thread-safe cleanup
 button_last_pressed = 0
+physical_button_triggers = {}  # Track physical button triggers
 
-# --- Logging Setup (unchanged) ---
+# --- Logging Setup ---
 def setup_logging():
     try:
         Path(config.LOG_DIR).mkdir(parents=True, exist_ok=True)
         log_level = getattr(logging, config.LOG_LEVEL.upper(), logging.INFO)
         formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        file_handler = RotatingFileHandler(os.path.join(config.LOG_DIR, config.LOG_FILE), maxBytes=config.LOG_MAX_SIZE, backupCount=config.LOG_BACKUP_COUNT)
+        file_handler = RotatingFileHandler(
+            os.path.join(config.LOG_DIR, config.LOG_FILE), 
+            maxBytes=config.LOG_MAX_SIZE, 
+            backupCount=config.LOG_BACKUP_COUNT
+        )
         file_handler.setFormatter(formatter)
         file_handler.setLevel(log_level)
         console_handler = logging.StreamHandler(sys.stdout)
@@ -200,7 +238,7 @@ def setup_logging():
         print(f"Failed to setup logging: {e}")
         logging.basicConfig(level=logging.INFO)
 
-# --- GPIO Setup (unchanged) ---
+# --- GPIO Setup ---
 def setup_gpio():
     try:
         GPIO.setmode(GPIO.BCM)
@@ -212,6 +250,7 @@ def setup_gpio():
             initial_state = GPIO.HIGH if config.RELAY_ACTIVE_LOW else GPIO.LOW
             GPIO.output(pin, initial_state)
             relay_locks[relay_num] = threading.Lock()
+            relay_states[relay_num] = False  # All relays start OFF
         
         # Setup physical button if enabled
         if config.BUTTON_ENABLED:
@@ -219,8 +258,10 @@ def setup_gpio():
                 pull_mode = GPIO.PUD_UP if config.BUTTON_PULL_UP else GPIO.PUD_DOWN
                 GPIO.setup(config.BUTTON_PIN, GPIO.IN, pull_up_down=pull_mode)
                 edge = GPIO.FALLING if config.BUTTON_PULL_UP else GPIO.RISING
-                GPIO.add_event_detect(config.BUTTON_PIN, edge, callback=button_pressed_callback, bouncetime=int(config.BUTTON_DEBOUNCE_TIME * 1000))
-                app.logger.info(f"Physical button setup on GPIO {config.BUTTON_PIN} (pull-up: {config.BUTTON_PULL_UP})")
+                # Limit debounce time to reasonable range
+                debounce_ms = min(int(config.BUTTON_DEBOUNCE_TIME * 1000), 2000)
+                GPIO.add_event_detect(config.BUTTON_PIN, edge, callback=button_pressed_callback, bouncetime=debounce_ms)
+                app.logger.info(f"Physical button setup on GPIO {config.BUTTON_PIN} (pull-up: {config.BUTTON_PULL_UP}, debounce: {debounce_ms}ms)")
             except Exception as e:
                 app.logger.error(f"Failed to setup physical button: {e}")
         
@@ -244,13 +285,15 @@ def button_pressed_callback(channel):
     
     target_relay = config.BUTTON_TARGET_RELAY
     if 1 <= target_relay <= len(config.RELAY_PINS):
+        # Track physical button trigger
+        physical_button_triggers[target_relay] = current_time
         thread = threading.Thread(target=trigger_relay, args=(target_relay, "physical_button"))
         thread.daemon = True
         thread.start()
     else:
         app.logger.error(f"Invalid target relay {target_relay} for physical button")
 
-# --- Relay Control (updated with individual timers) ---
+# --- Relay Control ---
 def trigger_relay(relay_num, source="web"):
     """Trigger a relay with individual timer duration"""
     global active_triggers
@@ -277,23 +320,31 @@ def trigger_relay(relay_num, source="web"):
         pin = config.RELAY_PINS[relay_num]
         on_state = GPIO.LOW if config.RELAY_ACTIVE_LOW else GPIO.HIGH
         GPIO.output(pin, on_state)
+        relay_states[relay_num] = True
         app.logger.info(f"Relay {relay_num} (GPIO {pin}) turned ON by {source} for {timer_duration}s")
         
         time.sleep(timer_duration)
         
         off_state = GPIO.HIGH if config.RELAY_ACTIVE_LOW else GPIO.LOW
         GPIO.output(pin, off_state)
+        relay_states[relay_num] = False
         app.logger.info(f"Relay {relay_num} (GPIO {pin}) turned OFF")
+        
+        # Clean up physical button trigger tracking
+        if relay_num in physical_button_triggers:
+            del physical_button_triggers[relay_num]
+        
         return True
     except Exception as e:
         app.logger.error(f"Error triggering relay {relay_num} from {source}: {e}")
+        relay_states[relay_num] = False
         return False
     finally:
         relay_locks[relay_num].release()
         with active_triggers_lock:
             active_triggers -= 1
 
-# --- Security Check (unchanged) ---
+# --- Security Check ---
 @app.before_request
 def check_auth():
     if request.endpoint == 'health_check':
@@ -311,7 +362,7 @@ def check_auth():
                 app.logger.warning(f"Unauthorized access attempt from {client_ip}")
                 return jsonify({'status': 'error', 'message': 'Unauthorized IP'}), 403
 
-# --- Main Routes (updated with individual timer info) ---
+# --- Main Routes ---
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -363,7 +414,8 @@ def get_status():
                 'state': 'ON' if is_on else 'OFF',
                 'locked': relay_locks[relay_num].locked(),
                 'gpio_pin': pin,
-                'timer_duration': config.get_relay_timer(relay_num)
+                'timer_duration': config.get_relay_timer(relay_num),
+                'triggered_by_button': relay_num in physical_button_triggers
             }
         return jsonify(status)
     except Exception as e:
@@ -374,7 +426,7 @@ def get_status():
 def health_check():
     return jsonify({'status': 'healthy', 'timestamp': datetime.now().isoformat()})
 
-# --- Admin Panel Routes (updated for individual timers) ---
+# --- Admin Panel Routes ---
 @app.route('/admin.html')
 def admin_html_redirect():
     return redirect(url_for('admin_panel'))
@@ -401,27 +453,35 @@ def set_config():
     if not new_config:
         return jsonify({'status': 'error', 'message': 'Invalid data received'}), 400
 
-    app.logger.info("Received new configuration. Saving...")
-    if config.save_config(new_config):
+    try:
+        app.logger.info("Received new configuration. Validating and saving...")
+        config.save_config(new_config)
         app.logger.info("Configuration saved. Triggering service restart.")
         
         def restart_service():
             time.sleep(1)
             try:
-                subprocess.run(["sudo", "systemctl", "restart", "relay-control.service"], check=True)
-                app.logger.info("Service restart command issued.")
+                result = subprocess.run(
+                    ["sudo", "systemctl", "restart", "relay-control.service"], 
+                    check=True,
+                    capture_output=True,
+                    text=True
+                )
+                app.logger.info("Service restart command issued successfully.")
             except subprocess.CalledProcessError as e:
-                app.logger.error(f"Failed to restart service: {e}")
+                app.logger.error(f"Failed to restart service: {e.stderr}")
             except FileNotFoundError:
                 app.logger.error("Could not find 'sudo' command. Ensure it's in the system's PATH.")
 
         threading.Thread(target=restart_service).start()
         
         return jsonify({'status': 'success', 'message': 'Configuration saved. Restarting service.'})
-    else:
-        return jsonify({'status': 'error', 'message': 'Failed to save configuration file.'}), 500
+    except ValueError as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 400
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': f'Failed to save configuration: {str(e)}'}), 500
 
-# --- Error Handlers & Cleanup (unchanged) ---
+# --- Error Handlers & Cleanup ---
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({'status': 'error', 'message': 'Endpoint not found'}), 404
@@ -433,24 +493,25 @@ def internal_error(error):
 
 def cleanup_gpio():
     global cleanup_done
-    if not cleanup_done:
-        cleanup_done = True
-        try:
-            off_state = GPIO.HIGH if config.RELAY_ACTIVE_LOW else GPIO.LOW
-            for pin in config.RELAY_PINS.values():
-                GPIO.output(pin, off_state)
-            
-            if config.BUTTON_ENABLED:
-                try:
-                    GPIO.remove_event_detect(config.BUTTON_PIN)
-                    app.logger.info("Physical button event detection removed")
-                except Exception as e:
-                    app.logger.error(f"Error removing button event detection: {e}")
-            
-            GPIO.cleanup()
-            app.logger.info("GPIO cleanup completed")
-        except Exception as e:
-            app.logger.error(f"Error during GPIO cleanup: {e}")
+    with cleanup_lock:
+        if not cleanup_done:
+            cleanup_done = True
+            try:
+                off_state = GPIO.HIGH if config.RELAY_ACTIVE_LOW else GPIO.LOW
+                for pin in config.RELAY_PINS.values():
+                    GPIO.output(pin, off_state)
+                
+                if config.BUTTON_ENABLED:
+                    try:
+                        GPIO.remove_event_detect(config.BUTTON_PIN)
+                        app.logger.info("Physical button event detection removed")
+                    except Exception as e:
+                        app.logger.error(f"Error removing button event detection: {e}")
+                
+                GPIO.cleanup()
+                app.logger.info("GPIO cleanup completed")
+            except Exception as e:
+                app.logger.error(f"Error during GPIO cleanup: {e}")
 
 def signal_handler(signum, frame):
     app.logger.info(f"Received signal {signum}, shutting down...")
