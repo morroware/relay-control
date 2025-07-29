@@ -75,6 +75,10 @@
             animation: pulse 0.5s infinite alternate;
         }
 
+        .relay-button.button-triggered {
+            background-color: #2196F3;
+        }
+
         .relay-name {
             font-size: 18px;
             margin-bottom: 5px;
@@ -91,6 +95,13 @@
             margin-top: 5px;
             color: #fff;
             font-weight: bold;
+        }
+
+        .relay-source {
+            font-size: 10px;
+            margin-top: 3px;
+            opacity: 0.9;
+            font-style: italic;
         }
 
         @keyframes pulse {
@@ -194,41 +205,49 @@
                 <div class="relay-name">Relay 1</div>
                 <div class="relay-timer" id="timer1">Loading...</div>
                 <div class="relay-countdown" id="countdown1" style="display: none;"></div>
+                <div class="relay-source" id="source1" style="display: none;"></div>
             </button>
             <button class="relay-button" onclick="triggerRelay(2)" id="relay2">
                 <div class="relay-name">Relay 2</div>
                 <div class="relay-timer" id="timer2">Loading...</div>
                 <div class="relay-countdown" id="countdown2" style="display: none;"></div>
+                <div class="relay-source" id="source2" style="display: none;"></div>
             </button>
             <button class="relay-button" onclick="triggerRelay(3)" id="relay3">
                 <div class="relay-name">Relay 3</div>
                 <div class="relay-timer" id="timer3">Loading...</div>
                 <div class="relay-countdown" id="countdown3" style="display: none;"></div>
+                <div class="relay-source" id="source3" style="display: none;"></div>
             </button>
             <button class="relay-button" onclick="triggerRelay(4)" id="relay4">
                 <div class="relay-name">Relay 4</div>
                 <div class="relay-timer" id="timer4">Loading...</div>
                 <div class="relay-countdown" id="countdown4" style="display: none;"></div>
+                <div class="relay-source" id="source4" style="display: none;"></div>
             </button>
             <button class="relay-button" onclick="triggerRelay(5)" id="relay5">
                 <div class="relay-name">Relay 5</div>
                 <div class="relay-timer" id="timer5">Loading...</div>
                 <div class="relay-countdown" id="countdown5" style="display: none;"></div>
+                <div class="relay-source" id="source5" style="display: none;"></div>
             </button>
             <button class="relay-button" onclick="triggerRelay(6)" id="relay6">
                 <div class="relay-name">Relay 6</div>
                 <div class="relay-timer" id="timer6">Loading...</div>
                 <div class="relay-countdown" id="countdown6" style="display: none;"></div>
+                <div class="relay-source" id="source6" style="display: none;"></div>
             </button>
             <button class="relay-button" onclick="triggerRelay(7)" id="relay7">
                 <div class="relay-name">Relay 7</div>
                 <div class="relay-timer" id="timer7">Loading...</div>
                 <div class="relay-countdown" id="countdown7" style="display: none;"></div>
+                <div class="relay-source" id="source7" style="display: none;"></div>
             </button>
             <button class="relay-button" onclick="triggerRelay(8)" id="relay8">
                 <div class="relay-name">Relay 8</div>
                 <div class="relay-timer" id="timer8">Loading...</div>
                 <div class="relay-countdown" id="countdown8" style="display: none;"></div>
+                <div class="relay-source" id="source8" style="display: none;"></div>
             </button>
         </div>
         <div id="status" class="status"></div>
@@ -239,6 +258,7 @@
         let activeRelays = new Set();
         let relayTimers = {};
         let countdownIntervals = {};
+        let statusCheckInterval;
 
         // Load relay timers and update display
         function loadRelayTimers() {
@@ -291,7 +311,7 @@
             countdownIntervals[relayNum] = setInterval(updateCountdown, 100);
         }
 
-        // Check system status
+        // Check system status and sync with server
         function checkStatus() {
             fetch('/status')
                 .then(response => response.json())
@@ -306,6 +326,48 @@
                         relayTimers = data.relay_timers;
                         updateTimerDisplay();
                     }
+                    
+                    // Sync relay states with server
+                    for (let i = 1; i <= 8; i++) {
+                        const relayData = data.relays[i];
+                        const button = document.getElementById(`relay${i}`);
+                        const sourceElement = document.getElementById(`source${i}`);
+                        
+                        if (relayData.state === 'ON' && !activeRelays.has(i)) {
+                            // Relay is ON but we don't know about it (physical button or refresh)
+                            activeRelays.add(i);
+                            button.disabled = true;
+                            button.classList.add('active');
+                            
+                            if (relayData.triggered_by_button) {
+                                button.classList.add('button-triggered');
+                                sourceElement.textContent = '(Physical Button)';
+                                sourceElement.style.display = 'block';
+                            }
+                            
+                            // Estimate remaining time (we don't know exact start time)
+                            const duration = relayData.timer_duration;
+                            startCountdown(i, duration * 0.8); // Assume 80% time remaining
+                        } else if (relayData.state === 'OFF' && activeRelays.has(i)) {
+                            // Relay is OFF but we think it's ON
+                            activeRelays.delete(i);
+                            button.disabled = false;
+                            button.classList.remove('active', 'button-triggered');
+                            sourceElement.style.display = 'none';
+                            
+                            // Clear countdown
+                            if (countdownIntervals[i]) {
+                                clearInterval(countdownIntervals[i]);
+                                delete countdownIntervals[i];
+                                const countdownElement = document.getElementById(`countdown${i}`);
+                                const timerElement = document.getElementById(`timer${i}`);
+                                if (countdownElement && timerElement) {
+                                    countdownElement.style.display = 'none';
+                                    timerElement.style.display = 'block';
+                                }
+                            }
+                        }
+                    }
                 })
                 .catch(error => {
                     document.getElementById('connectionStatus').textContent = 'Disconnected';
@@ -319,8 +381,8 @@
         document.addEventListener('DOMContentLoaded', function() {
             loadRelayTimers();
             checkStatus();
-            // Check status every 5 seconds
-            setInterval(checkStatus, 5000);
+            // Check status every 2 seconds for better sync
+            statusCheckInterval = setInterval(checkStatus, 2000);
         });
 
         function triggerRelay(relayNum) {
@@ -335,6 +397,7 @@
             }
 
             const button = document.getElementById(`relay${relayNum}`);
+            const sourceElement = document.getElementById(`source${relayNum}`);
             const duration = relayTimers[relayNum] || 2.0;
 
             // Add to active relays
@@ -343,6 +406,8 @@
             // Disable button and add active class
             button.disabled = true;
             button.classList.add('active');
+            button.classList.remove('button-triggered');
+            sourceElement.style.display = 'none';
 
             // Send request to Flask backend
             fetch(`/relay/${relayNum}`, {
@@ -367,8 +432,9 @@
                     // Reset button after duration
                     setTimeout(() => {
                         button.disabled = false;
-                        button.classList.remove('active');
+                        button.classList.remove('active', 'button-triggered');
                         activeRelays.delete(relayNum);
+                        sourceElement.style.display = 'none';
                         
                         // Clear any remaining countdown
                         if (countdownIntervals[relayNum]) {
@@ -388,8 +454,9 @@
                 console.error('Error:', error);
                 showStatus(error.message || `Failed to trigger relay ${relayNum}`, 'error');
                 button.disabled = false;
-                button.classList.remove('active');
+                button.classList.remove('active', 'button-triggered');
                 activeRelays.delete(relayNum);
+                sourceElement.style.display = 'none';
                 
                 // Clear countdown on error
                 if (countdownIntervals[relayNum]) {
@@ -416,6 +483,16 @@
                 statusDiv.style.display = 'none';
             }, 3000);
         }
+
+        // Clean up on page unload
+        window.addEventListener('beforeunload', function() {
+            if (statusCheckInterval) {
+                clearInterval(statusCheckInterval);
+            }
+            Object.keys(countdownIntervals).forEach(key => {
+                clearInterval(countdownIntervals[key]);
+            });
+        });
     </script>
 </body>
 </html>
