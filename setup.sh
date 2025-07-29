@@ -4,6 +4,12 @@
 
 set -e
 
+# --- CONFIGURATION ---
+# Set your username here
+USERNAME="tech"
+# --- END CONFIGURATION ---
+
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -11,15 +17,15 @@ YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
 # Configuration
-APP_DIR="/home/pi/relay_control"
+APP_DIR="/home/${USERNAME}/relay_control"
 SERVICE_NAME="relay-control"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 LOG_DIR="/var/log/relay_control"
 NGINX_AVAILABLE="/etc/nginx/sites-available/relay-control"
 NGINX_ENABLED="/etc/nginx/sites-enabled/relay-control"
 
-echo -e "${GREEN}Relay Control Service Setup Script${NC}"
-echo "===================================="
+echo -e "${GREEN}Relay Control Service Setup Script for user '${USERNAME}'${NC}"
+echo "==========================================================="
 
 # Check if running as root
 if [[ $EUID -ne 0 ]]; then
@@ -45,25 +51,31 @@ echo -e "${GREEN}2. Creating application directory...${NC}"
 mkdir -p $APP_DIR
 mkdir -p $APP_DIR/templates
 mkdir -p $LOG_DIR
-chown pi:pi $LOG_DIR
+chown ${USERNAME}:${USERNAME} $LOG_DIR
+
+# <<< FIX: Change ownership of the app directory to the correct user >>>
+chown -R ${USERNAME}:${USERNAME} $APP_DIR
 
 echo -e "${GREEN}3. Creating Python virtual environment...${NC}"
 cd $APP_DIR
-sudo -u pi python3 -m venv venv
-source venv/bin/activate
+# Use the USERNAME variable to run the command
+sudo -u ${USERNAME} python3 -m venv venv
 
 echo -e "${GREEN}4. Installing Python dependencies...${NC}"
-pip install --upgrade pip
-pip install flask gunicorn RPi.GPIO
+# It's more reliable to call pip from the venv directly
+"${APP_DIR}/venv/bin/pip" install --upgrade pip
+"${APP_DIR}/venv/bin/pip" install flask gunicorn RPi.GPIO
 
 echo -e "${GREEN}5. Setting up GPIO permissions...${NC}"
-# Add pi user to gpio group if not already added
-if ! groups pi | grep -q gpio; then
-    usermod -a -G gpio pi
-    echo -e "${YELLOW}Added user 'pi' to 'gpio' group${NC}"
+# Add user to gpio group if not already added
+if ! groups ${USERNAME} | grep -q gpio; then
+    usermod -a -G gpio ${USERNAME}
+    echo -e "${YELLOW}Added user '${USERNAME}' to 'gpio' group${NC}"
 fi
 
 echo -e "${GREEN}6. Creating systemd service...${NC}"
+# IMPORTANT: This script assumes you have a 'relay-control.service' file
+# in the same directory. You must edit that file as well!
 cp relay-control.service $SERVICE_FILE
 systemctl daemon-reload
 systemctl enable $SERVICE_NAME
@@ -179,7 +191,8 @@ EOF
 chmod +x $APP_DIR/test_gpio.py
 
 echo -e "${GREEN}9. Setting permissions...${NC}"
-chown -R pi:pi $APP_DIR
+# Use the USERNAME variable for final ownership
+chown -R ${USERNAME}:${USERNAME} $APP_DIR
 chmod -R 755 $APP_DIR
 
 echo -e "${GREEN}10. Setup complete!${NC}"
@@ -220,3 +233,4 @@ fi
 
 echo ""
 echo -e "${GREEN}Setup completed successfully!${NC}"
+
