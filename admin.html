@@ -97,6 +97,10 @@
         .submit-button:hover {
             background-color: #D32F2F;
         }
+        .submit-button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
         .status {
             text-align: center;
             padding: 10px;
@@ -113,6 +117,11 @@
         .status.error {
             background-color: #B71C1C;
             color: #FFCDD2;
+            display: block;
+        }
+        .status.warning {
+            background-color: #F57C00;
+            color: #FFE0B2;
             display: block;
         }
         a {
@@ -158,6 +167,13 @@
         .preset-btn:hover {
             background-color: #555;
         }
+        .error-text {
+            color: #EF5350;
+            font-size: 12px;
+            margin-top: -10px;
+            margin-bottom: 10px;
+            display: none;
+        }
         @media (max-width: 768px) {
             .form-grid {
                 grid-template-columns: 1fr;
@@ -196,7 +212,7 @@
                     </div>
 
                     <label for="button_pin">Button GPIO Pin</label>
-                    <input type="number" id="button_pin" name="button_pin">
+                    <input type="number" id="button_pin" name="button_pin" min="0" max="27">
 
                     <label for="button_target_relay">Target Relay (1-8)</label>
                     <input type="number" id="button_target_relay" name="button_target_relay" min="1" max="8">
@@ -208,21 +224,24 @@
 
                     <label for="button_debounce_time">Debounce Time (seconds)</label>
                     <input type="number" id="button_debounce_time" name="button_debounce_time" step="0.1" min="0.1" max="2">
+                    <div class="info-text">Recommended: 0.3 seconds</div>
                 </div>
             </div>
 
             <div class="form-grid">
                 <div class="form-section">
                     <h2>Relay GPIO Pins</h2>
+                    <div class="info-text">Valid GPIO range: 0-27. Ensure no duplicates!</div>
+                    <div id="gpio-error" class="error-text"></div>
                     <div class="relay-pins-grid">
-                        <label for="pin1">Relay 1:</label> <input type="number" id="pin1" name="pin1"> <span></span>
-                        <label for="pin2">Relay 2:</label> <input type="number" id="pin2" name="pin2"> <span></span>
-                        <label for="pin3">Relay 3:</label> <input type="number" id="pin3" name="pin3"> <span></span>
-                        <label for="pin4">Relay 4:</label> <input type="number" id="pin4" name="pin4"> <span></span>
-                        <label for="pin5">Relay 5:</label> <input type="number" id="pin5" name="pin5"> <span></span>
-                        <label for="pin6">Relay 6:</label> <input type="number" id="pin6" name="pin6"> <span></span>
-                        <label for="pin7">Relay 7:</label> <input type="number" id="pin7" name="pin7"> <span></span>
-                        <label for="pin8">Relay 8:</label> <input type="number" id="pin8" name="pin8"> <span></span>
+                        <label for="pin1">Relay 1:</label> <input type="number" id="pin1" name="pin1" min="0" max="27"> <span></span>
+                        <label for="pin2">Relay 2:</label> <input type="number" id="pin2" name="pin2" min="0" max="27"> <span></span>
+                        <label for="pin3">Relay 3:</label> <input type="number" id="pin3" name="pin3" min="0" max="27"> <span></span>
+                        <label for="pin4">Relay 4:</label> <input type="number" id="pin4" name="pin4" min="0" max="27"> <span></span>
+                        <label for="pin5">Relay 5:</label> <input type="number" id="pin5" name="pin5" min="0" max="27"> <span></span>
+                        <label for="pin6">Relay 6:</label> <input type="number" id="pin6" name="pin6" min="0" max="27"> <span></span>
+                        <label for="pin7">Relay 7:</label> <input type="number" id="pin7" name="pin7" min="0" max="27"> <span></span>
+                        <label for="pin8">Relay 8:</label> <input type="number" id="pin8" name="pin8" min="0" max="27"> <span></span>
                     </div>
                 </div>
 
@@ -238,19 +257,19 @@
                     </div>
 
                     <div class="relay-timers-grid">
-                        <label for="timer1">Relay 1:</label> <input type="number" id="timer1" name="timer1" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
-                        <label for="timer2">Relay 2:</label> <input type="number" id="timer2" name="timer2" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
-                        <label for="timer3">Relay 3:</label> <input type="number" id="timer3" name="timer3" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
-                        <label for="timer4">Relay 4:</label> <input type="number" id="timer4" name="timer4" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
-                        <label for="timer5">Relay 5:</label> <input type="number" id="timer5" name="timer5" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
-                        <label for="timer6">Relay 6:</label> <input type="number" id="timer6" name="timer6" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
-                        <label for="timer7">Relay 7:</label> <input type="number" id="timer7" name="timer7" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
-                        <label for="timer8">Relay 8:</label> <input type="number" id="timer8" name="timer8" step="0.1" min="0.1" max="300"> <span class="timer-unit">sec</span>
+                        <label for="timer1">Relay 1:</label> <input type="number" id="timer1" name="timer1" step="0.1" min="0.1" max="300"> <span class="timer-unit">seconds</span>
+                        <label for="timer2">Relay 2:</label> <input type="number" id="timer2" name="timer2" step="0.1" min="0.1" max="300"> <span class="timer-unit">seconds</span>
+                        <label for="timer3">Relay 3:</label> <input type="number" id="timer3" name="timer3" step="0.1" min="0.1" max="300"> <span class="timer-unit">seconds</span>
+                        <label for="timer4">Relay 4:</label> <input type="number" id="timer4" name="timer4" step="0.1" min="0.1" max="300"> <span class="timer-unit">seconds</span>
+                        <label for="timer5">Relay 5:</label> <input type="number" id="timer5" name="timer5" step="0.1" min="0.1" max="300"> <span class="timer-unit">seconds</span>
+                        <label for="timer6">Relay 6:</label> <input type="number" id="timer6" name="timer6" step="0.1" min="0.1" max="300"> <span class="timer-unit">seconds</span>
+                        <label for="timer7">Relay 7:</label> <input type="number" id="timer7" name="timer7" step="0.1" min="0.1" max="300"> <span class="timer-unit">seconds</span>
+                        <label for="timer8">Relay 8:</label> <input type="number" id="timer8" name="timer8" step="0.1" min="0.1" max="300"> <span class="timer-unit">seconds</span>
                     </div>
                 </div>
             </div>
 
-            <button type="submit" class="submit-button">Save and Restart Service</button>
+            <button type="submit" class="submit-button" id="submitBtn">Save and Restart Service</button>
         </form>
         <div id="status" class="status"></div>
         <a href="/">Back to Control Panel</a>
@@ -263,6 +282,54 @@
                 document.getElementById(`timer${i}`).value = seconds;
             }
         }
+
+        // Validate GPIO pins
+        function validateGPIOPins() {
+            const pins = [];
+            const errorDiv = document.getElementById('gpio-error');
+            
+            // Collect all GPIO pins
+            for (let i = 1; i <= 8; i++) {
+                const pinInput = document.getElementById(`pin${i}`);
+                const pin = parseInt(pinInput.value);
+                
+                if (isNaN(pin) || pin < 0 || pin > 27) {
+                    errorDiv.textContent = `GPIO pin for Relay ${i} must be between 0 and 27`;
+                    errorDiv.style.display = 'block';
+                    return false;
+                }
+                
+                pins.push(pin);
+            }
+            
+            // Check for duplicates
+            const uniquePins = new Set(pins);
+            if (uniquePins.size !== pins.length) {
+                errorDiv.textContent = 'Duplicate GPIO pins detected!';
+                errorDiv.style.display = 'block';
+                return false;
+            }
+            
+            // Check if button pin conflicts with relay pins
+            if (document.getElementById('button_enabled').checked) {
+                const buttonPin = parseInt(document.getElementById('button_pin').value);
+                if (pins.includes(buttonPin)) {
+                    errorDiv.textContent = 'Button GPIO pin conflicts with relay pins!';
+                    errorDiv.style.display = 'block';
+                    return false;
+                }
+            }
+            
+            errorDiv.style.display = 'none';
+            return true;
+        }
+
+        // Add real-time GPIO validation
+        document.querySelectorAll('input[id^="pin"]').forEach(input => {
+            input.addEventListener('change', validateGPIOPins);
+        });
+        document.getElementById('button_pin').addEventListener('change', validateGPIOPins);
+        document.getElementById('button_enabled').addEventListener('change', validateGPIOPins);
 
         // Fetch current config and populate the form
         fetch('/admin/config')
@@ -300,7 +367,13 @@
         document.getElementById('configForm').addEventListener('submit', function(event) {
             event.preventDefault();
             const statusDiv = document.getElementById('status');
+            const submitBtn = document.getElementById('submitBtn');
             statusDiv.style.display = 'none';
+
+            // Validate GPIO pins first
+            if (!validateGPIOPins()) {
+                return;
+            }
 
             const formData = new FormData(event.target);
             
@@ -332,13 +405,23 @@
                 }
             };
 
-            // Validate timer values
+            // Client-side validation
             let validationError = null;
+            
+            // Validate timer values
             for (let i = 1; i <= 8; i++) {
                 const timer = relayTimers[i.toString()];
                 if (isNaN(timer) || timer < 0.1 || timer > 300) {
                     validationError = `Relay ${i} timer must be between 0.1 and 300 seconds`;
                     break;
+                }
+            }
+            
+            // Validate debounce time
+            if (data.physical_button.enabled) {
+                const debounce = data.physical_button.debounce_time;
+                if (isNaN(debounce) || debounce < 0.1 || debounce > 2.0) {
+                    validationError = 'Debounce time must be between 0.1 and 2.0 seconds';
                 }
             }
 
@@ -348,6 +431,10 @@
                 statusDiv.style.display = 'block';
                 return;
             }
+
+            // Disable submit button during save
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Saving...';
 
             fetch('/admin/config', {
                 method: 'POST',
@@ -359,9 +446,17 @@
                 if (result.status === 'success') {
                     statusDiv.className = 'status success';
                     statusDiv.textContent = 'Configuration saved! Service is restarting...';
+                    
+                    // Show additional warning about reconnection
+                    setTimeout(() => {
+                        statusDiv.className = 'status warning';
+                        statusDiv.textContent = 'Service restarting. You may need to refresh the page in a few seconds.';
+                    }, 3000);
                 } else {
                     statusDiv.className = 'status error';
                     statusDiv.textContent = `Error: ${result.message}`;
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Save and Restart Service';
                 }
                 statusDiv.style.display = 'block';
             })
@@ -369,6 +464,8 @@
                 statusDiv.className = 'status error';
                 statusDiv.textContent = `An unexpected error occurred: ${error}`;
                 statusDiv.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Save and Restart Service';
             });
         });
     </script>
