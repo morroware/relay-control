@@ -22,7 +22,7 @@
             padding: 30px;
             border-radius: 10px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            max-width: 600px;
+            max-width: 800px;
             width: 100%;
             position: relative;
         }
@@ -45,13 +45,29 @@
             color: white;
             border: none;
             padding: 20px;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: bold;
             border-radius: 8px;
             cursor: pointer;
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 80px;
+        }
+
+        .relay-button .relay-name {
+            font-size: 18px;
+            margin-bottom: 5px;
+        }
+
+        .relay-button .relay-number {
+            font-size: 12px;
+            opacity: 0.8;
         }
 
         .relay-button:hover {
@@ -128,8 +144,23 @@
         .connection-status.disconnected {
             color: #f44336;
         }
+
+        .admin-link {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .admin-link a {
+            color: #2196F3;
+            text-decoration: none;
+        }
+
+        .admin-link a:hover {
+            text-decoration: underline;
+        }
         
-        @media (max-width: 480px) {
+        @media (max-width: 600px) {
             .relay-grid {
                 grid-template-columns: 1fr;
             }
@@ -139,26 +170,28 @@
 <body>
     <div class="container">
         <div class="status-indicator" id="systemStatus"></div>
-        <h1>8-Relay Control Panel</h1>
+        <h1>Relay Control Panel</h1>
         <div class="connection-status" id="connectionStatus">Checking connection...</div>
         <div class="relay-grid">
-            <button class="relay-button" onclick="triggerRelay(1)">Relay 1</button>
-            <button class="relay-button" onclick="triggerRelay(2)">Relay 2</button>
-            <button class="relay-button" onclick="triggerRelay(3)">Relay 3</button>
-            <button class="relay-button" onclick="triggerRelay(4)">Relay 4</button>
-            <button class="relay-button" onclick="triggerRelay(5)">Relay 5</button>
-            <button class="relay-button" onclick="triggerRelay(6)">Relay 6</button>
-            <button class="relay-button" onclick="triggerRelay(7)">Relay 7</button>
-            <button class="relay-button" onclick="triggerRelay(8)">Relay 8</button>
+            {% for relay_num, info in relay_info.items() %}
+            <button class="relay-button" onclick="triggerRelay({{ relay_num }})" data-relay="{{ relay_num }}">
+                <span class="relay-name">{{ info.name }}</span>
+                <span class="relay-number">Relay {{ relay_num }} (GPIO {{ info.pin }})</span>
+            </button>
+            {% endfor %}
         </div>
         <div id="status" class="status"></div>
+        <div class="admin-link">
+            <a href="/admin">Admin Dashboard</a>
+        </div>
     </div>
 
     <script>
         let isConnected = true;
         let activeRelays = new Set();
+        let relayNames = {};
 
-        // Check system status
+        // Check system status and update relay names
         function checkStatus() {
             fetch('/status')
                 .then(response => response.json())
@@ -167,6 +200,13 @@
                     document.getElementById('connectionStatus').className = 'connection-status connected';
                     document.getElementById('systemStatus').className = 'status-indicator';
                     isConnected = true;
+                    
+                    // Update relay names from status
+                    if (data.relays) {
+                        Object.keys(data.relays).forEach(relayNum => {
+                            relayNames[relayNum] = data.relays[relayNum].name;
+                        });
+                    }
                 })
                 .catch(error => {
                     document.getElementById('connectionStatus').textContent = 'Disconnected';
@@ -187,12 +227,13 @@
             }
 
             if (activeRelays.has(relayNum)) {
-                showStatus(`Relay ${relayNum} is already active`, 'error');
+                showStatus(`${relayNames[relayNum] || 'Relay ' + relayNum} is already active`, 'error');
                 return;
             }
 
-            const button = event.target;
+            const button = event.target.closest('.relay-button');
             const statusDiv = document.getElementById('status');
+            const relayName = relayNames[relayNum] || `Relay ${relayNum}`;
 
             // Add to active relays
             activeRelays.add(relayNum);
@@ -200,7 +241,9 @@
             // Disable button and add active class
             button.disabled = true;
             button.classList.add('active');
-            button.textContent = `Relay ${relayNum} ON`;
+            const nameSpan = button.querySelector('.relay-name');
+            const originalName = nameSpan.textContent;
+            nameSpan.textContent = `${originalName} ON`;
 
             // Send request to Flask backend
             fetch(`/relay/${relayNum}`, {
@@ -217,23 +260,23 @@
             })
             .then(data => {
                 if (data.status === 'success') {
-                    showStatus(`Relay ${relayNum} triggered for ${data.duration} seconds`, 'success');
+                    showStatus(`${relayName} triggered for ${data.duration} seconds`, 'success');
 
                     // Reset button after duration
                     setTimeout(() => {
                         button.disabled = false;
                         button.classList.remove('active');
-                        button.textContent = `Relay ${relayNum}`;
+                        nameSpan.textContent = originalName;
                         activeRelays.delete(relayNum);
                     }, data.duration * 1000);
                 }
             })
             .catch(error => {
                 console.error('Error:', error);
-                showStatus(error.message || `Failed to trigger relay ${relayNum}`, 'error');
+                showStatus(error.message || `Failed to trigger ${relayName}`, 'error');
                 button.disabled = false;
                 button.classList.remove('active');
-                button.textContent = `Relay ${relayNum}`;
+                nameSpan.textContent = originalName;
                 activeRelays.delete(relayNum);
             });
         }

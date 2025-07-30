@@ -5,11 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=pi
+User=tech
 Group=gpio
-WorkingDirectory=/home/pi/relay_control
-Environment="PATH=/home/pi/.local/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=/usr/bin/python3 /home/pi/relay_control/app.py
+# Corrected paths below
+WorkingDirectory=/home/tech/8-relay
+ExecStart=/home/tech/8-relay/venv/bin/gunicorn --workers 3 --bind unix:relay_control.sock -m 007 app:app
+
 Restart=always
 RestartSec=10
 
@@ -17,8 +18,7 @@ RestartSec=10
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
-ProtectHome=read-only
-ReadWritePaths=/var/log/relay_control
+ReadWritePaths=/var/log/relay_control /home/tech/8-relay
 
 # Resource limits
 CPUQuota=50%

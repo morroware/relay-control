@@ -9,26 +9,36 @@
         "7": 25,
         "8": 4
     },
+    "relay_names": {
+        "1": "Living Room Lights",
+        "2": "Kitchen Lights",
+        "3": "Bedroom Fan",
+        "4": "Outdoor Lights",
+        "5": "Garage Door",
+        "6": "Water Pump",
+        "7": "Security System",
+        "8": "Spare Relay"
+    },
     "relay_settings": {
         "active_low": true,
-        "max_concurrent_triggers": 3
+        "trigger_durations": {
+            "1": 0.5,
+            "2": 0.5,
+            "3": 0.5,
+            "4": 0.5,
+            "5": 0.5,
+            "6": 0.5,
+            "7": 0.5,
+            "8": 0.5
+        },
+        "max_concurrent_triggers": 1
     },
-    "relay_timers": {
-        "1": 2.0,
-        "2": 3.0,
-        "3": 1.5,
-        "4": 5.0,
-        "5": 2.5,
-        "6": 4.0,
-        "7": 1.0,
-        "8": 10.0
-    },
-    "physical_button": {
+    "button_settings": {
         "enabled": true,
-        "pin": 2,
+        "button_pin": 26,
+        "relay_number": 1,
         "pull_up": true,
-        "debounce_time": 0.3,
-        "target_relay": 1
+        "debounce_time": 0.3
     },
     "server": {
         "host": "0.0.0.0",
@@ -40,11 +50,6 @@
         "log_file": "relay_control.log",
         "max_size_mb": 10,
         "backup_count": 5,
-        "log_level": "INFO"
-    },
-    "security": {
-        "enable_auth": false,
-        "api_key": "",
-        "allowed_ips": []
+        "log_level": "DEBUG"
     }
 }
