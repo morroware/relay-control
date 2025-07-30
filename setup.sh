@@ -97,21 +97,24 @@ fi
 echo -e "${GREEN}6. Creating systemd service...${NC}"
 cat > $SERVICE_FILE <<EOF
 [Unit]
-Description=8-Relay Control Service
+Description=Relay Control Web Service
 After=network.target
 
 [Service]
 Type=simple
 User=${USERNAME}
+Group=gpio
 WorkingDirectory=${APP_DIR}
-Environment="PATH=${APP_DIR}/venv/bin"
-ExecStart=${APP_DIR}/venv/bin/python ${APP_DIR}/app.py
+ExecStart=${APP_DIR}/venv/bin/gunicorn --workers 3 --bind unix:relay_control.sock -m 007 app:app
 Restart=always
 RestartSec=10
-
-# Logging
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=${LOG_DIR} ${APP_DIR}
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=relay-control
 
 [Install]
 WantedBy=multi-user.target
@@ -120,17 +123,17 @@ EOF
 systemctl daemon-reload
 systemctl enable $SERVICE_NAME
 
-echo -e "${GREEN}7. Setting up Nginx reverse proxy (optional)...${NC}"
-read -p "Do you want to set up Nginx reverse proxy? (y/N) " -n 1 -r
-echo
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    cat > $NGINX_AVAILABLE <<EOF
+echo -e "${GREEN}7. Setting up Nginx reverse proxy...${NC}"
+# Add Nginx user to gpio group to allow access to the Gunicorn socket
+usermod -a -G gpio www-data
+
+cat > $NGINX_AVAILABLE <<EOF
 server {
     listen 80;
     server_name _;
 
     location / {
-        proxy_pass http://127.0.0.1:5000;
+        proxy_pass http://unix:${APP_DIR}/relay_control.sock;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
@@ -154,15 +157,14 @@ server {
 }
 EOF
 
-    # Remove default nginx site if it exists
-    if [ -f "/etc/nginx/sites-enabled/default" ]; then
-        rm /etc/nginx/sites-enabled/default
-    fi
-
-    ln -sf $NGINX_AVAILABLE $NGINX_ENABLED
-    nginx -t && systemctl restart nginx
-    echo -e "${GREEN}Nginx configured successfully${NC}"
+# Remove default nginx site if it exists
+if [ -f "/etc/nginx/sites-enabled/default" ]; then
+    rm /etc/nginx/sites-enabled/default
 fi
+
+ln -sf $NGINX_AVAILABLE $NGINX_ENABLED
+nginx -t && systemctl restart nginx
+echo -e "${GREEN}Nginx configured successfully${NC}"
 
 echo -e "${GREEN}8. Creating convenience scripts...${NC}"
 
@@ -274,11 +276,7 @@ if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
     if systemctl is-active --quiet $SERVICE_NAME; then
         echo -e "${GREEN}Service started successfully!${NC}"
         echo ""
-        echo "Access the web interface at:"
-        echo "- http://$(hostname -I | cut -d' ' -f1):5000"
-        if [[ -f $NGINX_ENABLED ]]; then
-            echo "- http://$(hostname -I | cut -d' ' -f1)"
-        fi
+        echo "Access the web interface at: http://$(hostname -I | cut -d' ' -f1)"
     else
         echo -e "${RED}Service failed to start. Check logs with: sudo journalctl -u $SERVICE_NAME -n 50${NC}"
     fi
